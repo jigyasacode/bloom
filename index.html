@@ -1,0 +1,655 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Bloom — Productivity Hub</title>
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet"/>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Nunito', sans-serif; background: #FDF6FF; color: #3C3060; }
+    button:hover { filter: brightness(0.95); }
+    select:focus, input:focus { outline: 2px solid #B49FE0 !important; outline-offset: 1px; }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.2} }
+    ::-webkit-scrollbar { height: 5px; width: 5px; }
+    ::-webkit-scrollbar-track { background: #EEE8FF; }
+    ::-webkit-scrollbar-thumb { background: #B49FE0; border-radius: 10px; }
+  </style>
+</head>
+<body>
+<div id="root"></div>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script type="text/babel">
+const { useState, useEffect, useRef, useCallback } = React;
+
+const C = {
+  bg:"#FDF6FF", lav:"#EEE8FF", lavMid:"#B49FE0", lavDark:"#6B54B0",
+  peach:"#FFF0E8", peachMid:"#F4A87A", peachDark:"#B05A2A",
+  mint:"#E4F8F0", mintMid:"#6DBFA0", mintDark:"#2A7A58",
+  blush:"#FFE8F2", blushMid:"#E889B0",
+  sky:"#E4F0FF", skyMid:"#72A8E0", skyDark:"#1A5A9A",
+  white:"#FFFFFF", text:"#3C3060", sub:"#9080B8", border:"#EAE0F8",
+};
+const CATS  = ["Health","Work","Learning","Personal","Finance","Social"];
+const CPALS = ["#FFCCD5","#FFD6A5","#FDFFB6","#CAFFBF","#A0F0FF","#C4B0FF"];
+const JST   = ["Wishlist","Applied","Interview","Offer","Rejected"];
+const JBG   = {Wishlist:"#EDE9F7",Applied:"#D6EAF8",Interview:"#FEF9E7",Offer:"#D5F5E3",Rejected:"#FDEDEC"};
+const JFG   = {Wishlist:"#6B54B0",Applied:"#1A5A9A",Interview:"#8A6A00",Offer:"#1A6A31",Rejected:"#9A2020"};
+const TST   = ["Not Started","In Progress","Half Done","Fully Done"];
+const TBG   = {"Not Started":"#F0EEF8","In Progress":"#D6EAF8","Half Done":"#FEF9E7","Fully Done":"#D5F5E3"};
+const TFG   = {"Not Started":"#9080B8","In Progress":"#1A5A9A","Half Done":"#8A6A00","Fully Done":"#1A6A31"};
+
+const uid    = () => Math.random().toString(36).slice(2,9);
+const toDay  = () => new Date().toISOString().split("T")[0];
+const last7  = () => Array.from({length:7},(_,i)=>{ const d=new Date(); d.setDate(d.getDate()-(6-i)); return d.toISOString().split("T")[0]; });
+const fmtS   = s => { if(!s)return"0s"; const h=Math.floor(s/3600),m=Math.floor((s%3600)/60),sc=s%60; return h>0?h+"h "+m+"m":m>0?m+"m "+sc+"s":sc+"s"; };
+const getStreak = (id,logs) => { let n=0; const d=new Date(); while(true){ const k=d.toISOString().split("T")[0]; if((logs[k]||[]).includes(id)){n++;d.setDate(d.getDate()-1);}else break; } return n; };
+const empty  = () => ({habits:[],logs:{},tasks:[],jobs:[]});
+
+/* ── Shared UI ── */
+const Card  = ({children,bg=C.white,style={}}) => <div style={{background:bg,borderRadius:16,padding:"16px 20px",border:"1px solid "+C.border,marginBottom:14,...style}}>{children}</div>;
+const Badge = ({bg,fg,children,style={}}) => <span style={{padding:"3px 10px",borderRadius:20,background:bg,color:fg,fontSize:12,fontWeight:600,display:"inline-block",...style}}>{children}</span>;
+const Btn   = ({onClick,bg=C.lavMid,fg="white",children,style={}}) => <button onClick={onClick} style={{padding:"8px 16px",borderRadius:10,border:"none",background:bg,color:fg,fontWeight:600,cursor:"pointer",fontSize:13,...style}}>{children}</button>;
+const Inp   = ({style={},...p}) => <input {...p} style={{padding:"8px 12px",borderRadius:10,border:"1.5px solid "+C.border,fontSize:13,color:C.text,outline:"none",background:C.white,boxSizing:"border-box",...style}}/>;
+const Sel   = ({style={},...p}) => <select {...p} style={{padding:"8px 12px",borderRadius:10,border:"1.5px solid "+C.border,fontSize:13,color:C.text,background:C.white,cursor:"pointer",...style}}/>;
+
+/* ══════════════════════════════════════════════════════
+   APP
+══════════════════════════════════════════════════════ */
+function App() {
+  const [tab,setTab]     = useState("dashboard");
+  const [users,setUsers] = useState(["Me"]);
+  const [user,setUser]   = useState("Me");
+  const [data,setData]   = useState(empty());
+  const [loading,setLoading] = useState(true);
+  const uRef   = useRef(user);
+  const timers = useRef({});
+  const [running,setRunning] = useState({});
+
+  useEffect(()=>{ uRef.current = user; },[user]);
+
+  useEffect(()=>{
+    (async()=>{
+      setLoading(true);
+      Object.values(timers.current).forEach(clearInterval);
+      timers.current = {}; setRunning({});
+      try { const r = await fetch("/api/"+user); setData(await r.json()); }
+      catch { setData(empty()); }
+      setLoading(false);
+    })();
+  },[user]);
+
+  const persist = useCallback(async nd => {
+    setData(nd);
+    try { await fetch("/api/"+uRef.current,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify(nd)}); }
+    catch(e){ console.error(e); }
+  },[]);
+
+  const startTimer = id => {
+    if(timers.current[id]) return;
+    timers.current[id] = setInterval(()=>{
+      setData(prev => {
+        const tasks = prev.tasks.map(t => t.id===id?{...t,timeSpent:(t.timeSpent||0)+1}:t);
+        const nd = {...prev,tasks};
+        const spent = nd.tasks.find(t=>t.id===id).timeSpent;
+        fetch("/api/"+uRef.current+"/tasks/"+id,{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({timeSpent:spent})}).catch(()=>{});
+        return nd;
+      });
+    },1000);
+    setRunning(r=>({...r,[id]:true}));
+  };
+  const stopTimer = id => {
+    if(timers.current[id]){ clearInterval(timers.current[id]); delete timers.current[id]; }
+    setRunning(r=>({...r,[id]:false}));
+  };
+
+  /* ── TABS — AI tab added here ── */
+  const TABS = [
+    {id:"dashboard", icon:"◈", label:"Dashboard", ac:C.lavMid},
+    {id:"habits",    icon:"✦", label:"Habits",    ac:C.mintMid},
+    {id:"tasks",     icon:"◇", label:"Tasks",     ac:C.peachMid},
+    {id:"jobs",      icon:"◉", label:"Jobs",      ac:C.skyMid},
+    {id:"ai",        icon:"🤖", label:"AI",        ac:"#B49FE0"},
+  ];
+
+  return (
+    <div style={{fontFamily:"'Nunito',sans-serif",background:C.bg,minHeight:"100vh",color:C.text}}>
+      <header style={{background:C.white,borderBottom:"1px solid "+C.border,padding:"10px 22px",display:"flex",alignItems:"center",gap:14,flexWrap:"wrap",position:"sticky",top:0,zIndex:100}}>
+        <div style={{fontSize:17,fontWeight:800,color:C.lavDark,letterSpacing:-0.5,whiteSpace:"nowrap"}}>✿ Bloom</div>
+        <nav style={{display:"flex",gap:3,flex:1,justifyContent:"center",flexWrap:"wrap"}}>
+          {TABS.map(t=>(
+            <button key={t.id} onClick={()=>setTab(t.id)}
+              style={{padding:"7px 15px",borderRadius:20,border:"none",cursor:"pointer",background:tab===t.id?t.ac:"transparent",color:tab===t.id?C.white:C.sub,fontWeight:tab===t.id?700:500,fontSize:13}}>
+              {t.icon} {t.label}
+            </button>
+          ))}
+        </nav>
+        <div style={{display:"flex",gap:5,alignItems:"center",flexWrap:"wrap"}}>
+          {users.map(u=>(
+            <button key={u} onClick={()=>setUser(u)}
+              style={{padding:"5px 13px",borderRadius:20,border:"2px solid "+(u===user?C.lavMid:C.border),background:u===user?C.lav:C.white,cursor:"pointer",color:C.text,fontWeight:u===user?700:400,fontSize:12}}>
+              {u}
+            </button>
+          ))}
+          <button onClick={()=>{ const n=prompt("New user name:"); if(n&&n.trim()&&!users.includes(n.trim())) setUsers(p=>[...p,n.trim()]); }}
+            style={{width:26,height:26,borderRadius:"50%",border:"2px dashed "+C.lavMid,background:"transparent",cursor:"pointer",color:C.lavMid,fontSize:15,display:"flex",alignItems:"center",justifyContent:"center",padding:0}}>+</button>
+        </div>
+      </header>
+
+      <main style={{padding:"20px",maxWidth:1080,margin:"0 auto"}}>
+        {loading
+          ? <div style={{textAlign:"center",padding:80,color:C.sub}}>Loading... ✿</div>
+          : <>
+              {tab==="dashboard" && <Dashboard data={data}/>}
+              {tab==="habits"    && <Habits data={data} persist={persist} user={user}/>}
+              {tab==="tasks"     && <Tasks data={data} persist={persist} running={running} startTimer={startTimer} stopTimer={stopTimer}/>}
+              {tab==="jobs"      && <Jobs data={data} persist={persist}/>}
+              {tab==="ai"        && <AIAssistant data={data}/>}
+            </>
+        }
+      </main>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════
+   DASHBOARD
+══════════════════════════════════════════════════════ */
+function Dashboard({data}) {
+  const {habits,logs,tasks,jobs} = data;
+  const t = toDay(), tl = logs[t]||[];
+  const days = last7();
+  const tByS = TST.reduce((a,s)=>({...a,[s]:tasks.filter(x=>x.status===s).length}),{});
+  const jByS = JST.reduce((a,s)=>({...a,[s]:jobs.filter(j=>j.status===s).length}),{});
+  const focus = tasks.reduce((a,b)=>a+(b.timeSpent||0),0);
+  const topH  = [...habits].map(h=>({...h,st:getStreak(h.id,logs)})).sort((a,b)=>b.st-a.st).slice(0,3);
+  const medals = ["🥇","🥈","🥉"];
+
+  return (
+    <div>
+      <h2 style={{margin:"0 0 18px",fontSize:20,fontWeight:800}}>Good day! Here's your overview ✿</h2>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12,marginBottom:16}}>
+        {[
+          {l:"Habits Today", v:tl.length+"/"+habits.length, bg:C.mint,  fc:C.mintDark},
+          {l:"Tasks Done",   v:tByS["Fully Done"]+"/"+tasks.length, bg:C.peach, fc:C.peachDark},
+          {l:"Jobs Tracked", v:jobs.length, bg:C.sky,   fc:C.skyDark},
+          {l:"Focus Time",   v:fmtS(focus), bg:C.lav,   fc:C.lavDark},
+        ].map(({l,v,bg,fc})=>(
+          <div key={l} style={{background:bg,borderRadius:16,padding:"16px 14px",textAlign:"center",border:"1px solid "+C.border}}>
+            <div style={{fontSize:22,fontWeight:800,color:fc}}>{v}</div>
+            <div style={{fontSize:12,color:fc,marginTop:3,opacity:.8}}>{l}</div>
+          </div>
+        ))}
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>
+        <Card>
+          <div style={{fontWeight:700,fontSize:15,marginBottom:14}}>Weekly Habits</div>
+          <div style={{display:"flex",gap:6,alignItems:"flex-end",height:80}}>
+            {days.map(d=>{
+              const cnt=(logs[d]||[]).length, pct=habits.length?cnt/habits.length:0;
+              const lbl=new Date(d+"T12:00").toLocaleDateString("en",{weekday:"short"});
+              return (
+                <div key={d} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:3}}>
+                  <div style={{width:"100%",background:C.border,borderRadius:5,height:64,display:"flex",alignItems:"flex-end",overflow:"hidden"}}>
+                    <div style={{width:"100%",background:C.mintMid,borderRadius:5,height:Math.max(pct*100,pct>0?6:0)+"%"}}/>
+                  </div>
+                  <span style={{fontSize:10,color:C.sub}}>{lbl}</span>
+                </div>
+              );
+            })}
+          </div>
+        </Card>
+        <Card>
+          <div style={{fontWeight:700,fontSize:15,marginBottom:14}}>Task Status</div>
+          {TST.map(s=>{
+            const pct=tasks.length?(tByS[s]/tasks.length)*100:0;
+            return (
+              <div key={s} style={{display:"flex",alignItems:"center",gap:10,marginBottom:8}}>
+                <div style={{width:100,fontSize:12,color:C.sub,flexShrink:0}}>{s}</div>
+                <div style={{flex:1,background:C.border,borderRadius:5,height:9,overflow:"hidden"}}>
+                  <div style={{width:pct+"%",background:TFG[s],height:"100%",borderRadius:5}}/>
+                </div>
+                <div style={{width:18,textAlign:"right",fontSize:12,fontWeight:700,color:C.sub}}>{tByS[s]}</div>
+              </div>
+            );
+          })}
+        </Card>
+        <Card>
+          <div style={{fontWeight:700,fontSize:15,marginBottom:12}}>Job Pipeline</div>
+          <div style={{display:"flex",gap:7,flexWrap:"wrap"}}>
+            {JST.map(s=>(
+              <div key={s} style={{flex:1,minWidth:55,background:JBG[s],borderRadius:12,padding:"10px 6px",textAlign:"center",border:"1px solid "+C.border}}>
+                <div style={{fontSize:19,fontWeight:800,color:JFG[s]}}>{jByS[s]}</div>
+                <div style={{fontSize:10,color:JFG[s],marginTop:2}}>{s}</div>
+              </div>
+            ))}
+          </div>
+        </Card>
+        <Card>
+          <div style={{fontWeight:700,fontSize:15,marginBottom:12}}>Top Streaks</div>
+          {topH.length===0 && <p style={{color:C.sub,fontSize:13}}>Add habits to see streaks!</p>}
+          {topH.map((h,i)=>(
+            <div key={h.id} style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
+              <span style={{fontSize:18}}>{medals[i]}</span>
+              <div style={{flex:1}}>
+                <div style={{fontWeight:600,fontSize:14}}>{h.name}</div>
+                <div style={{fontSize:11,color:C.sub}}>{h.category}</div>
+              </div>
+              <Badge bg={h.color||C.lav} fg={C.lavDark}>{h.st}d streak</Badge>
+            </div>
+          ))}
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════
+   HABITS
+══════════════════════════════════════════════════════ */
+function Habits({data,persist,user}) {
+  const {habits,logs} = data;
+  const [adding,setAdding] = useState(false);
+  const [form,setForm] = useState({name:"",category:"Health",color:CPALS[0],reminder:""});
+  const t=toDay(), tl=logs[t]||[], days=last7();
+  const now=new Date();
+  const hhmm=String(now.getHours()).padStart(2,"0")+":"+String(now.getMinutes()).padStart(2,"0");
+
+  const toggle = async id => {
+    const res = await fetch("/api/"+user+"/logs/"+t+"/"+id,{method:"POST"});
+    persist({...data, logs:await res.json()});
+  };
+  const add = () => {
+    if(!form.name.trim()) return;
+    persist({...data, habits:[...habits,{id:uid(),...form}]});
+    setForm({name:"",category:"Health",color:CPALS[0],reminder:""}); setAdding(false);
+  };
+  const del = id => persist({...data, habits:habits.filter(h=>h.id!==id)});
+
+  return (
+    <div>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+        <h2 style={{margin:0,fontSize:19,fontWeight:800}}>✦ Habits</h2>
+        <Btn onClick={()=>setAdding(!adding)} bg={C.mintMid}>+ Add Habit</Btn>
+      </div>
+      {adding && (
+        <Card bg={C.mint} style={{marginBottom:14}}>
+          <div style={{fontWeight:700,marginBottom:10}}>New habit</div>
+          <div style={{display:"grid",gridTemplateColumns:"2fr 1fr",gap:10,marginBottom:10}}>
+            <Inp placeholder="Habit name…" value={form.name} onChange={e=>setForm({...form,name:e.target.value})} style={{width:"100%"}}/>
+            <Sel value={form.category} onChange={e=>setForm({...form,category:e.target.value})} style={{width:"100%"}}>
+              {CATS.map(c=><option key={c}>{c}</option>)}
+            </Sel>
+          </div>
+          <div style={{display:"flex",gap:10,alignItems:"center",flexWrap:"wrap"}}>
+            <div style={{display:"flex",gap:5}}>
+              {CPALS.map(c=>(
+                <div key={c} onClick={()=>setForm({...form,color:c})}
+                  style={{width:22,height:22,borderRadius:"50%",background:c,cursor:"pointer",border:form.color===c?"3px solid #888":"3px solid transparent"}}/>
+              ))}
+            </div>
+            <Inp type="time" value={form.reminder} onChange={e=>setForm({...form,reminder:e.target.value})} style={{width:120}} title="Daily reminder"/>
+            <Btn onClick={add} bg={C.mintMid}>Save</Btn>
+            <Btn onClick={()=>setAdding(false)} bg={C.border} fg={C.text}>Cancel</Btn>
+          </div>
+        </Card>
+      )}
+      {habits.length===0&&!adding && (
+        <div style={{textAlign:"center",padding:60,color:C.sub}}>
+          <div style={{fontSize:40,marginBottom:10}}>✿</div>No habits yet — add your first!
+        </div>
+      )}
+      <div style={{display:"flex",flexDirection:"column",gap:10}}>
+        {habits.map(h=>{
+          const done=tl.includes(h.id), st=getStreak(h.id,logs), remind=h.reminder&&h.reminder===hhmm&&!done;
+          return (
+            <Card key={h.id} bg={done?C.mint:C.white} style={{marginBottom:0,border:remind?"2px solid "+C.peachMid:"1px solid "+C.border}}>
+              <div style={{display:"flex",alignItems:"center",gap:12}}>
+                <button onClick={()=>toggle(h.id)}
+                  style={{width:36,height:36,borderRadius:"50%",border:"2.5px solid "+(h.color||C.lavMid),background:done?(h.color||C.lavMid):C.white,cursor:"pointer",fontSize:16,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,color:done?C.text:"transparent"}}>✓</button>
+                <div style={{flex:1}}>
+                  <div style={{fontWeight:600,fontSize:14,textDecoration:done?"line-through":"none",color:done?C.sub:C.text}}>{h.name}</div>
+                  <div style={{display:"flex",gap:5,marginTop:5,flexWrap:"wrap"}}>
+                    <Badge bg={h.color||C.lav} fg={C.lavDark}>{h.category}</Badge>
+                    {st>0&&<Badge bg={C.peach} fg={C.peachDark}>🔥 {st}-day</Badge>}
+                    {h.reminder&&<Badge bg={remind?C.peach:C.border} fg={remind?C.peachDark:C.sub}>⏰ {h.reminder}{remind?" · Now!":""}</Badge>}
+                  </div>
+                </div>
+                <div style={{display:"flex",gap:3,flexShrink:0}}>
+                  {days.map(d=><div key={d} title={d} style={{width:12,height:12,borderRadius:3,background:(logs[d]||[]).includes(h.id)?(h.color||C.mintMid):C.border}}/>)}
+                </div>
+                <button onClick={()=>del(h.id)} style={{background:"none",border:"none",cursor:"pointer",color:C.border,fontSize:16,flexShrink:0}}>✕</button>
+              </div>
+            </Card>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════
+   TASKS
+══════════════════════════════════════════════════════ */
+function Tasks({data,persist,running,startTimer,stopTimer}) {
+  const {tasks} = data;
+  const [adding,setAdding] = useState(false);
+  const [filter,setFilter] = useState("All");
+  const [form,setForm] = useState({title:"",category:"Work",dueDate:""});
+
+  const add = () => {
+    if(!form.title.trim()) return;
+    persist({...data, tasks:[...tasks,{id:uid(),...form,status:"Not Started",timeSpent:0}]});
+    setForm({title:"",category:"Work",dueDate:""}); setAdding(false);
+  };
+  const upd = (id,ch) => persist({...data, tasks:tasks.map(t=>t.id===id?{...t,...ch}:t)});
+  const del = id => { stopTimer(id); persist({...data, tasks:tasks.filter(t=>t.id!==id)}); };
+  const shown = filter==="All" ? tasks : tasks.filter(t=>t.status===filter);
+
+  return (
+    <div>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+        <h2 style={{margin:0,fontSize:19,fontWeight:800}}>◇ Tasks</h2>
+        <Btn onClick={()=>setAdding(!adding)} bg={C.peachMid}>+ Add Task</Btn>
+      </div>
+      <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:14}}>
+        {["All",...TST].map(f=>(
+          <button key={f} onClick={()=>setFilter(f)}
+            style={{padding:"5px 13px",borderRadius:20,border:"none",cursor:"pointer",fontSize:12,
+              background:filter===f?(f==="All"?C.peachMid:TBG[f]):C.border,
+              color:filter===f?(f==="All"?C.white:TFG[f]):C.sub,
+              fontWeight:filter===f?700:500}}>
+            {f}
+          </button>
+        ))}
+      </div>
+      {adding && (
+        <Card bg={C.peach} style={{marginBottom:14}}>
+          <div style={{fontWeight:700,marginBottom:10}}>New task</div>
+          <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
+            <Inp placeholder="Task title…" value={form.title} onChange={e=>setForm({...form,title:e.target.value})} style={{flex:2,minWidth:150}}/>
+            <Sel value={form.category} onChange={e=>setForm({...form,category:e.target.value})}>
+              {CATS.map(c=><option key={c}>{c}</option>)}
+            </Sel>
+            <Inp type="date" value={form.dueDate} onChange={e=>setForm({...form,dueDate:e.target.value})} style={{width:145}}/>
+            <Btn onClick={add} bg={C.peachMid}>Save</Btn>
+            <Btn onClick={()=>setAdding(false)} bg={C.border} fg={C.text}>Cancel</Btn>
+          </div>
+        </Card>
+      )}
+      {shown.length===0&&!adding && (
+        <div style={{textAlign:"center",padding:60,color:C.sub}}>
+          <div style={{fontSize:40,marginBottom:10}}>◇</div>No tasks here — add one!
+        </div>
+      )}
+      <div style={{display:"flex",flexDirection:"column",gap:10}}>
+        {shown.map(task=>{
+          const isR=running[task.id];
+          return (
+            <Card key={task.id} style={{marginBottom:0,padding:"13px 16px"}}>
+              <div style={{display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
+                <div style={{flex:1,minWidth:120}}>
+                  <div style={{fontWeight:600,fontSize:14}}>{task.title}</div>
+                  <div style={{display:"flex",gap:5,marginTop:5,flexWrap:"wrap"}}>
+                    <Badge bg={CPALS[CATS.indexOf(task.category)%CPALS.length]} fg={C.lavDark}>{task.category}</Badge>
+                    {task.dueDate&&<Badge bg={C.border} fg={C.sub}>📅 {task.dueDate}</Badge>}
+                    {task.timeSpent>0&&<Badge bg={C.sky} fg={C.skyDark}>⏱ {fmtS(task.timeSpent)}</Badge>}
+                  </div>
+                </div>
+                <select value={task.status} onChange={e=>upd(task.id,{status:e.target.value})}
+                  style={{padding:"7px 11px",borderRadius:10,border:"none",background:TBG[task.status],color:TFG[task.status],fontWeight:700,fontSize:12,cursor:"pointer"}}>
+                  {TST.map(s=><option key={s} value={s}>{s}</option>)}
+                </select>
+                <div style={{display:"flex",gap:6,alignItems:"center"}}>
+                  {isR&&<div style={{width:7,height:7,borderRadius:"50%",background:C.blushMid,animation:"blink 1s infinite"}}/>}
+                  <Btn onClick={()=>isR?stopTimer(task.id):startTimer(task.id)} bg={isR?C.blushMid:C.mintMid} style={{padding:"6px 13px",fontSize:12}}>
+                    {isR?"⏸ Pause":"▶ Start"}
+                  </Btn>
+                </div>
+                <button onClick={()=>del(task.id)} style={{background:"none",border:"none",cursor:"pointer",color:C.border,fontSize:15,flexShrink:0}}>✕</button>
+              </div>
+            </Card>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════
+   JOBS
+══════════════════════════════════════════════════════ */
+function Jobs({data,persist}) {
+  const {jobs} = data;
+  const [adding,setAdding] = useState(false);
+  const [filter,setFilter] = useState("All");
+  const [editId,setEditId] = useState(null);
+  const [ed,setEd] = useState({});
+  const [form,setForm] = useState({company:"",role:"",dateApplied:toDay(),source:"",status:"Applied",notes:""});
+
+  const add = () => {
+    if(!form.company.trim()) return;
+    persist({...data, jobs:[...jobs,{id:uid(),...form}]});
+    setForm({company:"",role:"",dateApplied:toDay(),source:"",status:"Applied",notes:""}); setAdding(false);
+  };
+  const del      = id => persist({...data, jobs:jobs.filter(j=>j.id!==id)});
+  const saveEdit = () => { persist({...data, jobs:jobs.map(j=>j.id===editId?{...j,...ed}:j)}); setEditId(null); };
+  const shown    = filter==="All" ? jobs : jobs.filter(j=>j.status===filter);
+
+  const th = {padding:"11px 13px",textAlign:"left",fontSize:12,color:C.sub,fontWeight:700,whiteSpace:"nowrap"};
+  const td = {padding:"11px 13px",fontSize:13,color:C.text,borderBottom:"1px solid "+C.border};
+
+  return (
+    <div>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+        <h2 style={{margin:0,fontSize:19,fontWeight:800}}>◉ Job Tracker</h2>
+        <Btn onClick={()=>setAdding(!adding)} bg={C.skyMid}>+ Add Application</Btn>
+      </div>
+      <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:14}}>
+        {["All",...JST].map(f=>(
+          <button key={f} onClick={()=>setFilter(f)}
+            style={{padding:"5px 13px",borderRadius:20,border:"none",cursor:"pointer",fontSize:12,
+              background:filter===f?(f==="All"?C.skyMid:JBG[f]):C.border,
+              color:filter===f?(f==="All"?C.white:JFG[f]):C.sub,
+              fontWeight:filter===f?700:500}}>
+            {f}
+          </button>
+        ))}
+      </div>
+      {adding && (
+        <Card bg={C.sky} style={{marginBottom:14}}>
+          <div style={{fontWeight:700,marginBottom:10}}>New application</div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:10}}>
+            <Inp placeholder="Company *" value={form.company} onChange={e=>setForm({...form,company:e.target.value})} style={{width:"100%"}}/>
+            <Inp placeholder="Role / Position" value={form.role} onChange={e=>setForm({...form,role:e.target.value})} style={{width:"100%"}}/>
+            <Inp type="date" value={form.dateApplied} onChange={e=>setForm({...form,dateApplied:e.target.value})} style={{width:"100%"}}/>
+            <Inp placeholder="Source (LinkedIn, Naukri…)" value={form.source} onChange={e=>setForm({...form,source:e.target.value})} style={{width:"100%"}}/>
+            <Sel value={form.status} onChange={e=>setForm({...form,status:e.target.value})} style={{width:"100%"}}>
+              {JST.map(s=><option key={s}>{s}</option>)}
+            </Sel>
+            <Inp placeholder="Notes…" value={form.notes} onChange={e=>setForm({...form,notes:e.target.value})} style={{width:"100%"}}/>
+          </div>
+          <div style={{display:"flex",gap:8}}>
+            <Btn onClick={add} bg={C.skyMid}>Save</Btn>
+            <Btn onClick={()=>setAdding(false)} bg={C.border} fg={C.text}>Cancel</Btn>
+          </div>
+        </Card>
+      )}
+      {shown.length===0&&!adding && (
+        <div style={{textAlign:"center",padding:60,color:C.sub}}>
+          <div style={{fontSize:40,marginBottom:10}}>◉</div>No applications yet!
+        </div>
+      )}
+      {shown.length>0 && (
+        <div style={{overflowX:"auto",borderRadius:16,border:"1px solid "+C.border,background:C.white}}>
+          <table style={{width:"100%",borderCollapse:"collapse"}}>
+            <thead>
+              <tr style={{background:C.sky}}>
+                {["Company","Role","Date","Source","Status","Notes",""].map(h=><th key={h} style={th}>{h}</th>)}
+              </tr>
+            </thead>
+            <tbody>
+              {shown.map((j,i)=>(
+                <tr key={j.id} style={{background:i%2?C.bg:C.white}}>
+                  {editId===j.id ? (
+                    <>
+                      {["company","role","dateApplied","source"].map(f=>(
+                        <td key={f} style={{...td,padding:"7px 10px"}}>
+                          <Inp value={ed[f]||""} onChange={e=>setEd({...ed,[f]:e.target.value})} type={f==="dateApplied"?"date":"text"} style={{padding:"5px 9px",width:"100%"}}/>
+                        </td>
+                      ))}
+                      <td style={{...td,padding:"7px 10px"}}>
+                        <Sel value={ed.status} onChange={e=>setEd({...ed,status:e.target.value})} style={{padding:"5px 9px"}}>
+                          {JST.map(s=><option key={s}>{s}</option>)}
+                        </Sel>
+                      </td>
+                      <td style={{...td,padding:"7px 10px"}}>
+                        <Inp value={ed.notes||""} onChange={e=>setEd({...ed,notes:e.target.value})} style={{padding:"5px 9px",width:"100%"}}/>
+                      </td>
+                      <td style={{...td,padding:"7px 10px"}}>
+                        <div style={{display:"flex",gap:4}}>
+                          <Btn onClick={saveEdit} bg={C.mintMid} style={{padding:"4px 10px",fontSize:12}}>✓</Btn>
+                          <Btn onClick={()=>setEditId(null)} bg={C.border} fg={C.text} style={{padding:"4px 10px",fontSize:12}}>✕</Btn>
+                        </div>
+                      </td>
+                    </>
+                  ) : (
+                    <>
+                      <td style={{...td,fontWeight:700}}>{j.company}</td>
+                      <td style={{...td,color:C.sub}}>{j.role}</td>
+                      <td style={{...td,color:C.sub,whiteSpace:"nowrap"}}>{j.dateApplied}</td>
+                      <td style={{...td,color:C.sub}}>{j.source}</td>
+                      <td style={td}><Badge bg={JBG[j.status]} fg={JFG[j.status]}>{j.status}</Badge></td>
+                      <td style={{...td,maxWidth:160,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",color:C.sub}}>{j.notes}</td>
+                      <td style={td}>
+                        <div style={{display:"flex",gap:6}}>
+                          <button onClick={()=>{setEditId(j.id);setEd({...j});}} style={{background:"none",border:"none",cursor:"pointer",fontSize:14}}>✏️</button>
+                          <button onClick={()=>del(j.id)} style={{background:"none",border:"none",cursor:"pointer",fontSize:14}}>🗑️</button>
+                        </div>
+                      </td>
+                    </>
+                  )}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════
+   AI ASSISTANT
+══════════════════════════════════════════════════════ */
+function AIAssistant({data}) {
+  const [messages,setMessages] = useState([{
+    role:"assistant",
+    text:"Hi! I'm Bloom AI 🌸 I can analyze your habits, tasks, and job applications — and help you plan your schedule. What would you like to know?",
+  }]);
+  const [input,setInput]   = useState("");
+  const [loading,setLoading] = useState(false);
+  const bottomRef = useRef(null);
+
+  const QUICK = [
+    {label:"📊 Weekly Report",    msg:"Give me a detailed weekly productivity report based on my data."},
+    {label:"✦ Habit Analysis",    msg:"Analyze my habit completion rates and streaks. What patterns do you see?"},
+    {label:"📅 Plan My Schedule", msg:"Based on my tasks and habits, create a realistic daily timetable for this week."},
+    {label:"💼 Job Hunt Summary", msg:"Summarize my job application progress and suggest next steps."},
+    {label:"⏱ Focus Insights",   msg:"Which tasks am I spending the most time on? Give me focus tips."},
+    {label:"🎯 Weekly Goals",     msg:"Suggest 3 specific goals I should focus on this week based on my current data."},
+  ];
+
+  useEffect(()=>{ bottomRef.current?.scrollIntoView({behavior:"smooth"}); },[messages,loading]);
+
+  const send = async text => {
+    const msg = (text||input).trim();
+    if(!msg||loading) return;
+    setInput("");
+    setMessages(prev=>[...prev,{role:"user",text:msg}]);
+    setLoading(true);
+    try {
+      const res  = await fetch("/api/ai/chat",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({message:msg,userData:data})});
+      const json = await res.json();
+      setMessages(prev=>[...prev,{role:"assistant",text:json.reply||json.error||"Sorry, something went wrong."}]);
+    } catch {
+      setMessages(prev=>[...prev,{role:"assistant",text:"⚠️ Could not reach the AI. Make sure OPENAI_API_KEY is set in your server."}]);
+    }
+    setLoading(false);
+  };
+
+  const fmt = text => text.split("\n").map((line,i)=>{
+    if(line.startsWith("### ")) return <div key={i} style={{fontWeight:800,fontSize:15,marginTop:10,marginBottom:4,color:C.lavDark}}>{line.slice(4)}</div>;
+    if(line.startsWith("## "))  return <div key={i} style={{fontWeight:800,fontSize:16,marginTop:12,marginBottom:4,color:C.lavDark}}>{line.slice(3)}</div>;
+    if(line.startsWith("# "))   return <div key={i} style={{fontWeight:800,fontSize:17,marginTop:14,marginBottom:6,color:C.lavDark}}>{line.slice(2)}</div>;
+    if(line.startsWith("- ")||line.startsWith("• ")) return <div key={i} style={{paddingLeft:14,marginBottom:3}}>{"• "+line.slice(2)}</div>;
+    if(line.match(/^\d+\. /))   return <div key={i} style={{paddingLeft:14,marginBottom:3}}>{line}</div>;
+    if(line.startsWith("**")&&line.endsWith("**")) return <div key={i} style={{fontWeight:700,marginTop:6}}>{line.slice(2,-2)}</div>;
+    if(line==="") return <div key={i} style={{height:6}}/>;
+    return <div key={i} style={{marginBottom:2}}>{line}</div>;
+  });
+
+  return (
+    <div style={{display:"flex",flexDirection:"column",height:"calc(100vh - 140px)",minHeight:400}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
+        <h2 style={{margin:0,fontSize:19,fontWeight:800}}>🤖 Bloom AI Assistant</h2>
+        <button onClick={()=>setMessages([{role:"assistant",text:"Chat cleared! How can I help you? 🌸"}])}
+          style={{background:C.border,border:"none",borderRadius:10,padding:"6px 14px",fontSize:12,color:C.sub,cursor:"pointer",fontWeight:600}}>
+          Clear Chat
+        </button>
+      </div>
+
+      {/* Quick chips */}
+      <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:12}}>
+        {QUICK.map(q=>(
+          <button key={q.label} onClick={()=>send(q.msg)} disabled={loading}
+            style={{padding:"6px 13px",borderRadius:20,border:"1.5px solid "+C.lavMid,background:C.lav,color:C.lavDark,fontSize:12,fontWeight:600,cursor:"pointer",whiteSpace:"nowrap",opacity:loading?.6:1}}>
+            {q.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Chat window */}
+      <div style={{flex:1,overflowY:"auto",background:C.white,borderRadius:16,border:"1px solid "+C.border,padding:16,display:"flex",flexDirection:"column",gap:12}}>
+        {messages.map((m,i)=>(
+          <div key={i} style={{display:"flex",justifyContent:m.role==="user"?"flex-end":"flex-start"}}>
+            <div style={{maxWidth:"80%",padding:"12px 16px",borderRadius:m.role==="user"?"18px 18px 4px 18px":"18px 18px 18px 4px",background:m.role==="user"?C.lavMid:C.lav,color:m.role==="user"?C.white:C.text,fontSize:13,lineHeight:1.6,boxShadow:"0 2px 8px #B49FE022"}}>
+              {m.role==="assistant" ? <div>{fmt(m.text)}</div> : m.text}
+            </div>
+          </div>
+        ))}
+        {loading && (
+          <div style={{display:"flex",justifyContent:"flex-start"}}>
+            <div style={{padding:"12px 18px",borderRadius:"18px 18px 18px 4px",background:C.lav,color:C.sub,fontSize:13}}>
+              <span style={{animation:"blink 1s infinite",display:"inline-block"}}>✿</span> Thinking...
+            </div>
+          </div>
+        )}
+        <div ref={bottomRef}/>
+      </div>
+
+      {/* Input bar */}
+      <div style={{display:"flex",gap:10,marginTop:12}}>
+        <input value={input} onChange={e=>setInput(e.target.value)}
+          onKeyDown={e=>e.key==="Enter"&&!e.shiftKey&&send()}
+          placeholder="Ask me anything about your productivity…"
+          style={{flex:1,padding:"12px 16px",borderRadius:12,border:"1.5px solid "+C.border,fontSize:13,color:C.text,outline:"none",background:C.white}}
+        />
+        <button onClick={()=>send()} disabled={loading}
+          style={{padding:"12px 22px",borderRadius:12,border:"none",background:loading?C.border:C.lavMid,color:loading?C.sub:C.white,fontWeight:700,cursor:loading?"not-allowed":"pointer",fontSize:14}}>
+          {loading?"...":"Send ✦"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════
+   MOUNT
+══════════════════════════════════════════════════════ */
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+</body>
+</html>

@@ -1,0 +1,69 @@
+[debug] [2026-05-01T21:02:16.132Z] ----------------------------------------------------------------------
+[debug] [2026-05-01T21:02:16.136Z] Command:       C:\Program Files\nodejs\node.exe C:\Users\jigya\AppData\Roaming\npm\node_modules\firebase-tools\lib\bin\firebase.js init
+[debug] [2026-05-01T21:02:16.137Z] CLI Version:   15.16.0
+[debug] [2026-05-01T21:02:16.137Z] Platform:      win32
+[debug] [2026-05-01T21:02:16.137Z] Node Version:  v22.14.0
+[debug] [2026-05-01T21:02:16.138Z] Time:          Sat May 02 2026 02:32:16 GMT+0530 (India Standard Time)
+[debug] [2026-05-01T21:02:16.138Z] ----------------------------------------------------------------------
+[debug] 
+[info] 
+     ######## #### ########  ######## ########     ###     ######  ########
+     ##        ##  ##     ## ##       ##     ##  ##   ##  ##       ##
+     ######    ##  ########  ######   ########  #########  ######  ######
+     ##        ##  ##    ##  ##       ##     ## ##     ##       ## ##
+     ##       #### ##     ## ######## ########  ##     ##  ######  ########
+
+You're about to initialize a Firebase project in this directory:
+
+  D:\bloom\bloom
+
+[info] 
+=== Project Setup
+[info] 
+[info] First, let's associate this project directory with a Firebase project.
+[info] You can create multiple project aliases by running firebase use --add, 
+[info] 
+[info] i  If you want to create a project in a Google Cloud organization or folder, please use "firebase projects:create" instead, and return to this command when you've created the project. 
+[debug] [2026-05-01T21:02:53.007Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2026-05-01T21:02:53.008Z] > authorizing via signed-in user (jigyasas295@gmail.com)
+[debug] [2026-05-01T21:03:27.011Z] Checked if tokens are valid: true, expires at: 1777672752202
+[debug] [2026-05-01T21:03:27.012Z] Checked if tokens are valid: true, expires at: 1777672752202
+[debug] [2026-05-01T21:03:27.018Z] >>> [apiv2][query] POST https://firebase.googleapis.com/v1/projects:checkProjectId [none]
+[debug] [2026-05-01T21:03:27.019Z] >>> [apiv2][body] POST https://firebase.googleapis.com/v1/projects:checkProjectId {"proposedId":"bloom-productivity"}
+[debug] [2026-05-01T21:03:29.082Z] <<< [apiv2][status] POST https://firebase.googleapis.com/v1/projects:checkProjectId 200
+[debug] [2026-05-01T21:03:29.083Z] <<< [apiv2][body] POST https://firebase.googleapis.com/v1/projects:checkProjectId {"projectIdStatus":"PROJECT_ID_UNAVAILABLE","suggestedProjectId":"bloom-productivity-94058"}
+[debug] [2026-05-01T21:03:38.475Z] Checked if tokens are valid: true, expires at: 1777672752202
+[debug] [2026-05-01T21:03:38.475Z] Checked if tokens are valid: true, expires at: 1777672752202
+[debug] [2026-05-01T21:03:38.477Z] >>> [apiv2][query] POST https://firebase.googleapis.com/v1/projects:checkProjectId [none]
+[debug] [2026-05-01T21:03:38.477Z] >>> [apiv2][body] POST https://firebase.googleapis.com/v1/projects:checkProjectId {"proposedId":"bloom-productivity-177"}
+[debug] [2026-05-01T21:03:39.463Z] <<< [apiv2][status] POST https://firebase.googleapis.com/v1/projects:checkProjectId 200
+[debug] [2026-05-01T21:03:39.463Z] <<< [apiv2][body] POST https://firebase.googleapis.com/v1/projects:checkProjectId {"projectIdStatus":"PROJECT_ID_AVAILABLE","suggestedProjectId":"bloom-productivity-177"}
+[debug] [2026-05-01T21:04:27.259Z] Checked if tokens are valid: true, expires at: 1777672752202
+[debug] [2026-05-01T21:04:27.267Z] Checked if tokens are valid: true, expires at: 1777672752202
+[debug] [2026-05-01T21:04:27.268Z] >>> [apiv2][query] POST https://cloudresourcemanager.googleapis.com/v1/projects [none]
+[debug] [2026-05-01T21:04:27.268Z] >>> [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects {"projectId":"bloom-productivity-177","name":"bloom-productivity-177"}
+[debug] [2026-05-01T21:04:29.585Z] <<< [apiv2][status] POST https://cloudresourcemanager.googleapis.com/v1/projects 200
+[debug] [2026-05-01T21:04:29.585Z] <<< [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects {"name":"operations/create_project.global.6575842875342532056"}
+[debug] [2026-05-01T21:04:29.587Z] Checked if tokens are valid: true, expires at: 1777672752202
+[debug] [2026-05-01T21:04:29.587Z] Checked if tokens are valid: true, expires at: 1777672752202
+[debug] [2026-05-01T21:04:29.587Z] >>> [apiv2][query] GET https://cloudresourcemanager.googleapis.com/v1/operations/create_project.global.6575842875342532056 [none]
+[debug] [2026-05-01T21:04:31.212Z] <<< [apiv2][status] GET https://cloudresourcemanager.googleapis.com/v1/operations/create_project.global.6575842875342532056 200
+[debug] [2026-05-01T21:04:31.212Z] <<< [apiv2][body] GET https://cloudresourcemanager.googleapis.com/v1/operations/create_project.global.6575842875342532056 {"name":"operations/create_project.global.6575842875342532056"}
+[debug] [2026-05-01T21:04:31.723Z] [Project Creation Poller] Retrying task index 0
+[debug] [2026-05-01T21:04:31.724Z] Checked if tokens are valid: true, expires at: 1777672752202
+[debug] [2026-05-01T21:04:31.724Z] Checked if tokens are valid: true, expires at: 1777672752202
+[debug] [2026-05-01T21:04:31.724Z] >>> [apiv2][query] GET https://cloudresourcemanager.googleapis.com/v1/operations/create_project.global.6575842875342532056 [none]
+[debug] [2026-05-01T21:04:32.135Z] <<< [apiv2][status] GET https://cloudresourcemanager.googleapis.com/v1/operations/create_project.global.6575842875342532056 200
+[debug] [2026-05-01T21:04:32.136Z] <<< [apiv2][body] GET https://cloudresourcemanager.googleapis.com/v1/operations/create_project.global.6575842875342532056 {"name":"operations/create_project.global.6575842875342532056","metadata":{"@type":"type.googleapis.com/google.cloudresourcemanager.v1.ProjectCreationStatus","gettable":true,"ready":true},"done":true,"response":{"@type":"type.googleapis.com/google.cloudresourcemanager.v1.Project","projectNumber":"934720659527","projectId":"bloom-productivity-177","lifecycleState":"ACTIVE","name":"bloom-productivity-177","createTime":"2026-05-01T21:04:29.413Z"}}
+[debug] [2026-05-01T21:04:32.139Z] Checked if tokens are valid: true, expires at: 1777672752202
+[debug] [2026-05-01T21:04:32.139Z] Checked if tokens are valid: true, expires at: 1777672752202
+[debug] [2026-05-01T21:04:32.139Z] >>> [apiv2][query] POST https://firebase.googleapis.com/v1beta1/projects/bloom-productivity-177:addFirebase [none]
+[debug] [2026-05-01T21:04:34.060Z] <<< [apiv2][status] POST https://firebase.googleapis.com/v1beta1/projects/bloom-productivity-177:addFirebase 403
+[debug] [2026-05-01T21:04:34.061Z] <<< [apiv2][body] POST https://firebase.googleapis.com/v1beta1/projects/bloom-productivity-177:addFirebase {"error":{"code":403,"message":"The caller does not have permission","status":"PERMISSION_DENIED"}}
+[debug] [2026-05-01T21:04:34.062Z] Request to https://firebase.googleapis.com/v1beta1/projects/bloom-productivity-177:addFirebase had HTTP Error: 403, The caller does not have permission
+[debug] [2026-05-01T21:04:34.403Z] FirebaseError: Request to https://firebase.googleapis.com/v1beta1/projects/bloom-productivity-177:addFirebase had HTTP Error: 403, The caller does not have permission
+    at responseToError (C:\Users\jigya\AppData\Roaming\npm\node_modules\firebase-tools\lib\responseToError.js:53:12)
+    at RetryOperation._fn (C:\Users\jigya\AppData\Roaming\npm\node_modules\firebase-tools\lib\apiv2.js:333:77)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+[error] 
+[error] Error: Failed to add Firebase to Google Cloud Platform project. See firebase-debug.log for more info.
